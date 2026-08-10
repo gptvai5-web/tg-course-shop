@@ -110,7 +110,7 @@ serve(async (req) => {
       }
     }
 
-    const siteUrl = Deno.env.get("SITE_URL") || "https://learningtelegram.lovable.app";
+    const siteUrl = Deno.env.get("SITE_URL") || "https://tgcourse.shop";
     const redirectUrl = `${siteUrl}/payment-status?invoice=${invoiceNumber}&status=${isSuccess ? "success" : "failed"}`;
 
     return new Response(null, {
