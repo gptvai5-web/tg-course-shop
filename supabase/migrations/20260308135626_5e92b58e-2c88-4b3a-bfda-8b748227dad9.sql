@@ -1,0 +1,1 @@
+ALTER TABLE public.chapter_videos ADD COLUMN embed_code TEXT DEFAULT NULL;

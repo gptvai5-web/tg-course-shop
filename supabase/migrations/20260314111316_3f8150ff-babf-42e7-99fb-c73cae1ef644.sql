@@ -1,0 +1,1 @@
+ALTER TABLE public.user_sessions ADD COLUMN IF NOT EXISTS ip_address TEXT DEFAULT '';

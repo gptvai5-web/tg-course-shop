@@ -1,0 +1,171 @@
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Hind+Siliguri:wght@400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 248 100% 5%;
+    --foreground: 0 0% 95%;
+
+    --card: 248 60% 10%;
+    --card-foreground: 0 0% 95%;
+
+    --popover: 248 60% 10%;
+    --popover-foreground: 0 0% 95%;
+
+    --primary: 274 100% 62%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 270 79% 33%;
+    --secondary-foreground: 0 0% 100%;
+
+    --muted: 248 40% 16%;
+    --muted-foreground: 260 20% 65%;
+
+    --accent: 274 60% 18%;
+    --accent-foreground: 274 100% 75%;
+
+    --destructive: 20 100% 49%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 260 30% 18%;
+    --input: 260 30% 18%;
+    --ring: 274 100% 62%;
+
+    --radius: 0.75rem;
+
+    --sidebar-background: 248 100% 4%;
+    --sidebar-foreground: 0 0% 90%;
+    --sidebar-primary: 274 100% 62%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 248 50% 12%;
+    --sidebar-accent-foreground: 0 0% 90%;
+    --sidebar-border: 260 30% 15%;
+    --sidebar-ring: 274 100% 62%;
+
+    --success: 142 71% 45%;
+    --success-foreground: 0 0% 100%;
+    --warning: 48 100% 50%;
+    --warning-foreground: 248 100% 5%;
+
+    --gradient-primary: linear-gradient(135deg, hsl(274, 100%, 62%), hsl(270, 79%, 33%));
+    --gradient-hero: linear-gradient(135deg, hsl(248, 100%, 5%), hsl(270, 60%, 18%));
+    --gradient-accent: linear-gradient(135deg, hsl(274, 100%, 62%), hsl(20, 100%, 49%));
+    --shadow-card: 0 4px 24px -4px hsl(274 100% 62% / 0.12);
+    --shadow-elevated: 0 8px 32px -8px hsl(274 100% 62% / 0.2);
+
+    --font-display: 'Hind Siliguri', 'Space Grotesk', sans-serif;
+    --font-body: 'Hind Siliguri', 'Space Grotesk', sans-serif;
+  }
+}
+
+/* Neon dot grid background pattern */
+.bg-dot-grid {
+  background-image: radial-gradient(circle at 1px 1px, hsl(274 100% 62% / 0.18) 1px, transparent 0);
+  background-size: 32px 32px;
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: var(--font-body);
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Hind Siliguri', var(--font-display);
+  }
+}
+
+@layer utilities {
+  .text-gradient {
+    @apply bg-clip-text text-transparent;
+    background-image: var(--gradient-primary);
+  }
+
+  .text-gradient-accent {
+    @apply bg-clip-text text-transparent;
+    background-image: var(--gradient-accent);
+  }
+
+  .bg-gradient-primary {
+    background-image: var(--gradient-primary);
+  }
+
+  .bg-gradient-hero {
+    background-image: var(--gradient-hero);
+  }
+
+  .bg-gradient-accent {
+    background-image: var(--gradient-accent);
+  }
+
+  .shadow-card {
+    box-shadow: var(--shadow-card);
+  }
+
+  .shadow-elevated {
+    box-shadow: var(--shadow-elevated);
+  }
+
+  /* Glassmorphism utilities */
+  .glass {
+    background: hsl(var(--card) / 0.6);
+    backdrop-filter: blur(16px) saturate(180%);
+    -webkit-backdrop-filter: blur(16px) saturate(180%);
+    border: 1px solid hsl(var(--border) / 0.5);
+  }
+
+  .glass-card {
+    background: hsl(var(--card) / 0.55);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    border: 1px solid hsl(var(--border) / 0.4);
+    box-shadow: 0 8px 32px hsl(var(--primary) / 0.06), inset 0 1px 0 hsl(var(--primary-foreground) / 0.05);
+  }
+
+  .glass-sidebar {
+    background: hsl(var(--sidebar-background));
+    backdrop-filter: blur(24px) saturate(200%);
+    -webkit-backdrop-filter: blur(24px) saturate(200%);
+  }
+
+  .glass-stats {
+    background: hsl(var(--card) / 0.45);
+    backdrop-filter: blur(24px) saturate(200%);
+    -webkit-backdrop-filter: blur(24px) saturate(200%);
+    border: 1px solid hsl(var(--border) / 0.3);
+    box-shadow: 0 4px 24px hsl(var(--primary) / 0.08), inset 0 1px 0 hsl(var(--primary-foreground) / 0.08);
+  }
+}
+
+/* YouTube piracy protection */
+.yt-piracy-shield iframe {
+  pointer-events: auto;
+}
+
+.yt-piracy-shield {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.yt-piracy-shield iframe + div,
+.yt-piracy-shield .ytp-youtube-button,
+.yt-piracy-shield .ytp-watermark {
+  display: none !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+.yt-piracy-shield .ytp-endscreen-content,
+.yt-piracy-shield .ytp-ce-element,
+.yt-piracy-shield .ytp-pause-overlay,
+.yt-piracy-shield .ytp-scroll-min,
+.yt-piracy-shield .ytp-show-cards-title {
+  display: none !important;
+}
