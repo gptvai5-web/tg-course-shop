@@ -33,22 +33,26 @@ const AdminFeatured = () => {
     const link = `/courses/${course.id}`;
     const existing = featured.find(f => f.link_url === link);
     if (existing) {
-      await supabase.from("featured_courses").delete().eq("id", existing.id);
+      const { error } = await supabase.from("featured_courses").delete().eq("id", existing.id);
+      if (error) { toast.error(error.message); return; }
       toast.success("Removed from featured");
     } else {
-      await supabase.from("featured_courses").insert({ title: course.title, image_url: course.image_url, link_url: link, display_order: featured.length });
+      const { error } = await supabase.from("featured_courses").insert({ title: course.title, image_url: course.image_url || "", link_url: link, display_order: featured.length });
+      if (error) { toast.error(error.message); return; }
       toast.success("Added to featured!");
     }
     fetchData();
   };
 
   const handleToggleActive = async (id: string, active: boolean) => {
-    await supabase.from("featured_courses").update({ is_active: active }).eq("id", id);
+    const { error } = await supabase.from("featured_courses").update({ is_active: active }).eq("id", id);
+    if (error) { toast.error(error.message); return; }
     setFeatured(f => f.map(item => item.id === id ? { ...item, is_active: active } : item));
   };
 
   const handleDeleteFeatured = async (id: string) => {
-    await supabase.from("featured_courses").delete().eq("id", id);
+    const { error } = await supabase.from("featured_courses").delete().eq("id", id);
+    if (error) { toast.error(error.message); return; }
     toast.success("Removed from featured");
     fetchData();
   };

@@ -19,21 +19,30 @@ const FeaturedCarousel = () => {
 
   useEffect(() => {
     const fetchAll = async () => {
-      const [{ data }, { data: statsData }] = await Promise.all([
-        supabase.from("featured_courses").select("id, title, image_url, link_url").eq("is_active", true).order("display_order"),
-        supabase.rpc("get_public_stats"),
-      ]);
-      setCourses(data || []);
-      const statsResult = statsData as any;
-      if (statsResult) {
-        setStats({
-          students: statsResult.total_enrollments || 0,
-          courses: statsResult.total_courses || 0,
-          teachers: statsResult.total_instructors || 0,
-          lessons: statsResult.total_lessons || 0,
-        });
+      try {
+        const [{ data, error }, { data: statsData, error: statsError }] = await Promise.all([
+          supabase.from("featured_courses").select("id, title, image_url, link_url").eq("is_active", true).order("display_order"),
+          supabase.rpc("get_public_stats"),
+        ]);
+        
+        if (error) console.error("Error fetching featured courses:", error);
+        if (statsError) console.error("Error fetching stats:", statsError);
+        
+        setCourses(data || []);
+        const statsResult = statsData as any;
+        if (statsResult) {
+          setStats({
+            students: statsResult.total_enrollments || 0,
+            courses: statsResult.total_courses || 0,
+            teachers: statsResult.total_instructors || 0,
+            lessons: statsResult.total_lessons || 0,
+          });
+        }
+      } catch (err) {
+        console.error("Unexpected error in FeaturedCarousel:", err);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     };
     fetchAll();
   }, []);
