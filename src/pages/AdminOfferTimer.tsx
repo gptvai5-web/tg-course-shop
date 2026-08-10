@@ -28,11 +28,17 @@ const AdminOfferTimer = () => {
   const [saving, setSaving] = useState(false);
 
   const fetchCourses = async () => {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("courses")
       .select("id, title, image_url, price, category, offer_end_date, offer_label")
       .eq("is_active", true)
       .order("display_order");
+    
+    if (error) {
+      console.error("Error fetching courses for offer timer:", error);
+      toast.error("Failed to load courses: " + error.message);
+    }
+    
     setCourses((data as Course[]) || []);
     setLoading(false);
   };
