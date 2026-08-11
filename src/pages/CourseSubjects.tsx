@@ -30,33 +30,63 @@ const CourseSubjects = () => {
   const [updates, setUpdates] = useState<CourseUpdate[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("subjects");
+  
+  // Cycle support
+  const [cycles, setCycles] = useState<any[]>([]);
+  const [enrolledCycleIds, setEnrolledCycleIds] = useState<Set<string>>(new Set());
+  const [isFullCourseEnrolled, setIsFullCourseEnrolled] = useState(false);
 
   useEffect(() => {
     if (!id || !user) return;
     const fetchData = async () => {
-      const [{ data: c }, { data: s }, { data: u }] = await Promise.all([
-        supabase.from("courses").select("id, title, instructor_name").eq("id", id).single(),
-        (supabase.from as any)("subjects").select("id, name, color, display_order").eq("course_id", id).eq("is_active", true).order("display_order"),
+      const [{ data: c }, { data: u }, { data: enrollData }] = await Promise.all([
+        supabase.from("courses").select("id, title, instructor_name, has_cycles").eq("id", id).single(),
         (supabase.from as any)("course_updates").select("*").eq("course_id", id).eq("is_active", true).order("created_at", { ascending: false }),
+        supabase.from("enrollments").select("id").eq("course_id", id).eq("user_id", user.id).maybeSingle()
       ]);
-      setCourse(c as CourseInfo | null);
-      const subjectsList = (s as Subject[]) || [];
-      setSubjects(subjectsList);
+      setCourse(c as any);
       setUpdates((u as CourseUpdate[]) || []);
+      
+      const isEnrolled = !!enrollData;
+      setIsFullCourseEnrolled(isEnrolled);
 
-      // Fetch chapter counts per subject
-      if (subjectsList.length > 0) {
-        const subjectIds = subjectsList.map(sub => sub.id);
-        const { data: chapters } = await (supabase.from as any)("chapters")
-          .select("subject_id")
-          .in("subject_id", subjectIds)
-          .eq("is_active", true);
-        const counts: Record<string, number> = {};
-        (chapters || []).forEach((ch: any) => {
-          counts[ch.subject_id] = (counts[ch.subject_id] || 0) + 1;
-        });
-        setChapterCounts(counts);
+      if (c?.has_cycles) {
+        const [{ data: cy }, { data: cyEn }] = await Promise.all([
+          supabase.from("cycles").select("*").eq("course_id", id).eq("is_active", true).order("created_at"),
+          supabase.from("cycle_enrollments").select("cycle_id").eq("course_id", id).eq("user_id", user.id)
+        ]);
+        
+        const cyclesList = cy || [];
+        setCycles(cyclesList);
+        if (cyEn) {
+          setEnrolledCycleIds(new Set(cyEn.map(e => e.cycle_id)));
+        }
+
+        if (cyclesList.length > 0) {
+          const cycleIds = cyclesList.map(cy => cy.id);
+          const { data: chapters } = await (supabase.from as any)("chapters").select("cycle_id").in("cycle_id", cycleIds).eq("is_active", true);
+          const counts: Record<string, number> = {};
+          (chapters || []).forEach((ch: any) => {
+            if (ch.cycle_id) counts[ch.cycle_id] = (counts[ch.cycle_id] || 0) + 1;
+          });
+          setChapterCounts(counts);
+        }
+      } else {
+        const { data: s } = await (supabase.from as any)("subjects").select("id, name, color, display_order").eq("course_id", id).eq("is_active", true).order("display_order");
+        const subjectsList = (s as Subject[]) || [];
+        setSubjects(subjectsList);
+        
+        if (subjectsList.length > 0) {
+          const subjectIds = subjectsList.map(sub => sub.id);
+          const { data: chapters } = await (supabase.from as any)("chapters").select("subject_id").in("subject_id", subjectIds).eq("is_active", true);
+          const counts: Record<string, number> = {};
+          (chapters || []).forEach((ch: any) => {
+            if (ch.subject_id) counts[ch.subject_id] = (counts[ch.subject_id] || 0) + 1;
+          });
+          setChapterCounts(counts);
+        }
       }
+
       setLoading(false);
     };
     fetchData();
@@ -129,32 +159,73 @@ const CourseSubjects = () => {
             ))}
           </div>
 
-          {/* Subjects Tab */}
+          {/* Subjects or Cycles Tab */}
           {activeTab === "subjects" && (
             <>
-              {subjects.length === 0 ? (
+              {((course as any)?.has_cycles ? cycles : subjects).length === 0 ? (
                 <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center py-20">
                   <BookOpen className="w-16 h-16 text-muted-foreground/30 mx-auto mb-4" />
-                  <p className="text-muted-foreground">No subjects available yet. Check back soon!</p>
+                  <p className="text-muted-foreground">No content available yet. Check back soon!</p>
                 </motion.div>
               ) : (
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 md:gap-5">
-                  {subjects.map((s, i) => (
+                  {(course as any)?.has_cycles ? cycles.map((c, i) => {
+                    const isEnrolled = isFullCourseEnrolled || enrolledCycleIds.has(c.id);
+                    return (
+                      <motion.div key={c.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}>
+                        {isEnrolled ? (
+                          <Link to={`/course/${id}/cycle/${c.id}`} className="block hover:scale-[1.03] hover:shadow-2xl transition-all duration-300 group">
+                            <div className="relative aspect-[3/4] rounded-2xl overflow-hidden flex flex-col bg-primary">
+                              <div className="flex-1 flex items-center justify-center px-4">
+                                <h3 className="font-bangla font-extrabold text-white text-center text-lg sm:text-xl md:text-2xl leading-tight drop-shadow-lg">{c.title}</h3>
+                              </div>
+                              <div className="bg-black/20 backdrop-blur-md p-3 md:p-4 flex items-center justify-between mt-auto">
+                                <div className="flex items-center gap-1.5 text-white/90">
+                                  <FileImage className="w-3.5 h-3.5" />
+                                  <span className="text-xs md:text-sm font-medium">{chapterCounts[c.id] || 0} Chapters</span>
+                                </div>
+                                <div className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center group-hover:bg-white/40 transition-colors">
+                                  <ArrowRight className="w-3 h-3 text-white" />
+                                </div>
+                              </div>
+                            </div>
+                          </Link>
+                        ) : (
+                          <div className="block cursor-not-allowed group">
+                            <div className="relative aspect-[3/4] rounded-2xl overflow-hidden flex flex-col bg-muted border border-border">
+                              <div className="flex-1 flex flex-col items-center justify-center px-4 opacity-50">
+                                <h3 className="font-bangla font-extrabold text-foreground text-center text-lg sm:text-xl md:text-2xl leading-tight">{c.title}</h3>
+                                <div className="mt-4 p-3 bg-background/80 backdrop-blur-sm rounded-full shadow-sm">
+                                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-muted-foreground"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                                </div>
+                              </div>
+                              <div className="bg-background/80 backdrop-blur-md p-3 md:p-4 flex items-center justify-between mt-auto border-t border-border">
+                                <div className="flex items-center gap-1.5 text-muted-foreground">
+                                  <span className="text-xs md:text-sm font-bold">৳{c.price}</span>
+                                </div>
+                                <Link to={`/course/${id}`} className="text-xs font-bold text-primary hover:underline">
+                                  Buy Now
+                                </Link>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </motion.div>
+                    );
+                  }) : subjects.map((s, i) => (
                     <motion.div key={s.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}>
                       <Link to={`/course/${id}/subject/${s.id}`} className="block hover:scale-[1.03] hover:shadow-2xl transition-all duration-300 group">
                         <div className="relative aspect-[3/4] rounded-2xl overflow-hidden flex flex-col" style={{ backgroundColor: s.color }}>
-                          {/* Centered subject name */}
                           <div className="flex-1 flex items-center justify-center px-4">
                             <h3 className="font-bangla font-extrabold text-white text-center text-lg sm:text-xl md:text-2xl leading-tight drop-shadow-lg">{s.name}</h3>
                           </div>
-                          {/* Bottom bar with chapter count and arrow */}
-                          <div className="flex items-center justify-between px-3 pb-3">
-                            <div className="flex items-center gap-1.5 text-white/80 text-xs font-medium">
-                              <BookOpen className="w-3.5 h-3.5" />
-                              <span>{chapterCounts[s.id] || 0} Chapters</span>
+                          <div className="bg-black/20 backdrop-blur-md p-3 md:p-4 flex items-center justify-between mt-auto">
+                            <div className="flex items-center gap-1.5 text-white/90">
+                              <FileImage className="w-3.5 h-3.5" />
+                              <span className="text-xs md:text-sm font-medium">{chapterCounts[s.id] || 0} Chapters</span>
                             </div>
-                            <div className="w-8 h-8 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center group-hover:bg-white/30 transition-colors">
-                              <ArrowRight className="w-4 h-4 text-white" />
+                            <div className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center group-hover:bg-white/40 transition-colors">
+                              <ArrowRight className="w-3 h-3 text-white" />
                             </div>
                           </div>
                         </div>

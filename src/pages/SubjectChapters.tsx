@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
 import { ArrowLeft, BookOpen, ArrowRight, Play, Lock } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -12,6 +12,9 @@ interface Subject { id: string; name: string; color: string; course_id: string; 
 
 const SubjectChapters = () => {
   const { id, subjectId } = useParams<{ id: string; subjectId: string }>();
+  const location = useLocation();
+  const isCycle = location.pathname.includes("/cycle/");
+  
   const { user } = useAuth();
   const [subject, setSubject] = useState<Subject | null>(null);
   const [chapters, setChapters] = useState<Chapter[]>([]);
@@ -23,12 +26,27 @@ const SubjectChapters = () => {
   useEffect(() => {
     if (!subjectId || !user || !id) return;
     const fetch = async () => {
-      const [{ data: s }, { data: ch }] = await Promise.all([
-        (supabase.from as any)("subjects").select("id, name, color, course_id").eq("id", subjectId).single(),
-        (supabase.from as any)("chapters").select("id, name, color, display_order, cycle_id").eq("subject_id", subjectId).eq("is_active", true).order("display_order"),
-      ]);
-      setSubject(s as Subject | null);
-      const chaptersList = (ch as Chapter[]) || [];
+      let sData = null;
+      let chData = null;
+      
+      if (isCycle) {
+        const [{ data: cData }, { data: chaptersData }] = await Promise.all([
+          supabase.from("cycles").select("id, title as name").eq("id", subjectId).single(),
+          (supabase.from as any)("chapters").select("id, name, color, display_order, cycle_id").eq("cycle_id", subjectId).eq("is_active", true).order("display_order"),
+        ]);
+        if (cData) sData = { ...cData, color: "#3B82F6", course_id: id };
+        chData = chaptersData;
+      } else {
+        const [{ data: subjData }, { data: chaptersData }] = await Promise.all([
+          (supabase.from as any)("subjects").select("id, name, color, course_id").eq("id", subjectId).single(),
+          (supabase.from as any)("chapters").select("id, name, color, display_order, cycle_id").eq("subject_id", subjectId).eq("is_active", true).order("display_order"),
+        ]);
+        sData = subjData;
+        chData = chaptersData;
+      }
+      
+      setSubject(sData as Subject | null);
+      const chaptersList = (chData as Chapter[]) || [];
       setChapters(chaptersList);
       
       // Check full enrollment
@@ -61,7 +79,7 @@ const SubjectChapters = () => {
       setLoading(false);
     };
     fetch();
-  }, [subjectId, user, id]);
+  }, [subjectId, user, id, isCycle]);
 
   if (loading) {
     return (
@@ -111,7 +129,8 @@ const SubjectChapters = () => {
                 
                 return (
                   <motion.div key={ch.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}>
-                    <Link to={isLocked ? `/course/${id}` : `/course/${id}/subject/${subjectId}/chapter/${ch.id}`} 
+                    <Link 
+                      to={isLocked ? `/course/${id}` : `/course/${id}/${isCycle ? 'cycle' : 'subject'}/${subjectId}/chapter/${ch.id}`} 
                       className={`block transition-all duration-300 group ${isLocked ? 'cursor-not-allowed opacity-80' : 'hover:scale-[1.03] hover:shadow-2xl'}`}>
                       <div className="relative aspect-[3/4] rounded-2xl overflow-hidden flex flex-col" style={{ backgroundColor: isLocked ? '#64748b' : ch.color }}>
                         

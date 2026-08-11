@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from "react";
-import { useParams, Link, useNavigate } from "react-router-dom";
+import { useParams, Link, useNavigate, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
 import { ArrowLeft, PlayCircle, Video, FileText, StickyNote, ClipboardList, CheckSquare, ExternalLink } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -159,6 +159,8 @@ const ChapterVideos = () => {
     url.includes("dailymotion.com/video/") ||
     url.includes("drive.google.com/file/d/");
 
+  const isCycle = location.pathname.includes("/cycle/");
+
   if (loading) {
     return (
       <div className="min-h-screen bg-background">
@@ -182,7 +184,7 @@ const ChapterVideos = () => {
       <div className="pt-20 sm:pt-24 pb-12 sm:pb-20 relative z-10">
         <div className="container mx-auto px-3 sm:px-4 max-w-6xl">
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="mb-6">
-            <Link to={`/course/${id}/subject/${subjectId}`} className="inline-flex items-center gap-2 text-primary font-medium text-sm mb-4 hover:gap-3 transition-all">
+            <Link to={`/course/${id}/${isCycle ? 'cycle' : 'subject'}/${subjectId}`} className="inline-flex items-center gap-2 text-primary font-medium text-sm mb-4 hover:gap-3 transition-all">
               <ArrowLeft className="w-4 h-4" /> Back to Chapters
             </Link>
             <div className="flex items-center gap-3">

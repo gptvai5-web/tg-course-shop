@@ -24,15 +24,16 @@ const MATERIAL_TYPES: Record<string, { label: string; icon: React.ElementType; c
 };
 
 const AdminCourseContent = () => {
-  const [view, setView] = useState<View>("courses");
+  const [view, setView] = useState<View | "cycles">("courses");
   const [courses, setCourses] = useState<Course[]>([]);
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [chapters, setChapters] = useState<Chapter[]>([]);
   const [cycles, setCycles] = useState<{id: string, title: string}[]>([]);
   const [videos, setVideos] = useState<ChapterVideo[]>([]);
   const [materials, setMaterials] = useState<Material[]>([]);
-  const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
+  const [selectedCourse, setSelectedCourse] = useState<(Course & { has_cycles?: boolean }) | null>(null);
   const [selectedSubject, setSelectedSubject] = useState<Subject | null>(null);
+  const [selectedCycle, setSelectedCycle] = useState<{id: string, title: string} | null>(null);
   const [selectedChapter, setSelectedChapter] = useState<Chapter | null>(null);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -58,17 +59,52 @@ const AdminCourseContent = () => {
 
   useEffect(() => { fetchCourses(); }, []);
 
-  const fetchCourses = async () => { setLoading(true); const { data } = await supabase.from("courses").select("id, title, offer_end_date, offer_label").eq("is_active", true).order("display_order"); setCourses((data as Course[]) || []); setLoading(false); };
+  const fetchCourses = async () => { setLoading(true); const { data } = await supabase.from("courses").select("id, title, offer_end_date, offer_label, has_cycles").eq("is_active", true).order("display_order"); setCourses((data as any) || []); setLoading(false); };
   const fetchSubjects = async (courseId: string) => { setLoading(true); const { data } = await (supabase.from as any)("subjects").select("*").eq("course_id", courseId).order("display_order"); setSubjects((data as Subject[]) || []); setLoading(false); };
-  const fetchChapters = async (subjectId: string) => { setLoading(true); const { data } = await (supabase.from as any)("chapters").select("*").eq("subject_id", subjectId).order("display_order"); setChapters((data as Chapter[]) || []); setLoading(false); };
+  const fetchChapters = async (subjectId: string, isCycle: boolean = false) => { 
+    setLoading(true); 
+    let query = (supabase.from as any)("chapters").select("*").order("display_order");
+    if (isCycle) {
+      query = query.eq("cycle_id", subjectId);
+    } else {
+      query = query.eq("subject_id", subjectId);
+    }
+    const { data } = await query;
+    setChapters((data as Chapter[]) || []); 
+    setLoading(false); 
+  };
   const fetchVideos = async (chapterId: string) => { setLoading(true); const { data } = await (supabase.from as any)("chapter_videos").select("*").eq("chapter_id", chapterId).order("display_order"); setVideos((data as ChapterVideo[]) || []); setLoading(false); };
   const fetchMaterials = async (chapterId: string) => { const { data } = await (supabase.from as any)("chapter_materials").select("*").eq("chapter_id", chapterId).order("display_order"); setMaterials((data as Material[]) || []); };
   const fetchCycles = async (courseId: string) => { const { data } = await supabase.from("cycles").select("id, title").eq("course_id", courseId).eq("is_active", true); setCycles(data || []); };
 
-  const openCourse = (c: Course) => { setSelectedCourse(c); setView("subjects"); fetchSubjects(c.id); fetchCycles(c.id); setOfferEndDate(c.offer_end_date || ""); setOfferLabel(c.offer_label || ""); };
-  const openSubject = (s: Subject) => { setSelectedSubject(s); setView("chapters"); fetchChapters(s.id); };
+  const openCourse = (c: any) => { 
+    setSelectedCourse(c); 
+    setOfferEndDate(c.offer_end_date || ""); 
+    setOfferLabel(c.offer_label || "");
+    if (c.has_cycles) {
+      setView("cycles");
+      fetchCycles(c.id);
+    } else {
+      setView("subjects"); 
+      fetchSubjects(c.id);
+    }
+  };
+  const openSubject = (s: Subject) => { setSelectedSubject(s); setView("chapters"); fetchChapters(s.id, false); };
+  const openCycle = (c: {id: string, title: string}) => { setSelectedCycle(c); setView("chapters"); fetchChapters(c.id, true); };
   const openChapter = (ch: Chapter) => { setSelectedChapter(ch); setView("videos"); fetchVideos(ch.id); fetchMaterials(ch.id); };
-  const goBack = () => { resetForm(); resetMaterialForm(); if (view === "videos") { setView("chapters"); setSelectedChapter(null); setMaterials([]); } else if (view === "chapters") { setView("subjects"); setSelectedSubject(null); } else if (view === "subjects") { setView("courses"); setSelectedCourse(null); setCycles([]); } };
+  const goBack = () => { 
+    resetForm(); 
+    resetMaterialForm(); 
+    if (view === "videos") { setView("chapters"); setSelectedChapter(null); setMaterials([]); } 
+    else if (view === "chapters") { 
+      if (selectedCourse?.has_cycles) {
+        setView("cycles"); setSelectedCycle(null);
+      } else {
+        setView("subjects"); setSelectedSubject(null); 
+      }
+    } 
+    else if (view === "subjects" || view === "cycles") { setView("courses"); setSelectedCourse(null); setCycles([]); } 
+  };
   const resetForm = () => { setShowForm(false); setEditItem(null); setFormName(""); setFormColor("#3B82F6"); setFormVideoUrl(""); setFormDescription(""); setFormEmbedCode(""); setFormCycleId("none"); };
   const resetMaterialForm = () => { setShowMaterialForm(false); setEditMaterial(null); setMatTitle(""); setMatUrl(""); setMatType("lecture_sheet"); };
 
@@ -107,10 +143,26 @@ const AdminCourseContent = () => {
   };
   const handleSaveChapter = async () => {
     if (!formName.trim()) return;
-    const cycleVal = formCycleId === "none" ? null : formCycleId;
-    if (editItem) { await (supabase.from as any)("chapters").update({ name: formName, color: formColor, cycle_id: cycleVal }).eq("id", editItem.id); toast.success("Chapter updated"); }
-    else { await (supabase.from as any)("chapters").insert({ subject_id: selectedSubject!.id, name: formName, color: formColor, cycle_id: cycleVal, display_order: chapters.length }); toast.success("Chapter created"); }
-    resetForm(); fetchChapters(selectedSubject!.id);
+    const isCycleMode = selectedCourse?.has_cycles;
+    
+    // In cycle mode, the formCycleId is not needed because it's determined by the selectedCycle
+    const subjectVal = isCycleMode ? null : selectedSubject!.id;
+    const cycleVal = isCycleMode ? selectedCycle!.id : (formCycleId === "none" ? null : formCycleId);
+
+    if (editItem) { 
+      await (supabase.from as any)("chapters").update({ name: formName, color: formColor, cycle_id: cycleVal }).eq("id", editItem.id); 
+      toast.success("Chapter updated"); 
+    }
+    else { 
+      await (supabase.from as any)("chapters").insert({ subject_id: subjectVal, name: formName, color: formColor, cycle_id: cycleVal, display_order: chapters.length }); 
+      toast.success("Chapter created"); 
+    }
+    resetForm(); 
+    if (isCycleMode) {
+      fetchChapters(selectedCycle!.id, true);
+    } else {
+      fetchChapters(selectedSubject!.id, false);
+    }
   };
   const handleSaveVideo = async () => {
     if (!formName.trim()) return;
@@ -144,9 +196,18 @@ const AdminCourseContent = () => {
     const parts: string[] = ["Courses"];
     if (selectedCourse) parts.push(selectedCourse.title);
     if (selectedSubject) parts.push(selectedSubject.name);
+    if (selectedCycle) parts.push(selectedCycle.title);
     if (selectedChapter) parts.push(selectedChapter.name);
     return parts;
   };
+
+  if (loading && view === "courses") {
+    return (
+      <AdminPageWrapper title="Course Content">
+        <div className="flex justify-center p-12"><div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" /></div>
+      </AdminPageWrapper>
+    );
+  }
 
   const renderForm = () => {
     const isVideo = view === "videos";
@@ -275,6 +336,27 @@ const AdminCourseContent = () => {
         </div>
       )}
 
+      {/* Cycles */}
+      {view === "cycles" && !loading && (
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {cycles.length === 0 ? (
+            <div className="col-span-full text-center py-16 text-muted-foreground"><BookOpen className="w-12 h-12 mx-auto mb-3 opacity-30" /><p className="text-sm">No cycles yet. Manage cycles from the Course Cycles menu.</p></div>
+          ) : cycles.map((c, i) => (
+            <motion.div key={c.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.03 }} className="glass-card rounded-2xl overflow-hidden hover:shadow-lg transition-all group">
+              <div className="h-2 bg-primary" />
+              <div className="p-5">
+                <div className="flex items-start justify-between">
+                  <button onClick={() => openCycle(c)} className="flex items-center gap-3 text-left flex-1 min-w-0">
+                    <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 bg-primary/10 text-primary"><BookOpen className="w-5 h-5" /></div>
+                    <div className="min-w-0"><p className="font-display font-bold text-sm truncate group-hover:text-primary transition-colors">{c.title}</p><p className="text-xs text-muted-foreground">Manage chapters</p></div>
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          ))}
+        </div>
+      )}
+
       {/* Subjects */}
       {view === "subjects" && !loading && (
         <>
@@ -353,7 +435,7 @@ const AdminCourseContent = () => {
                   </button>
                   <div className="flex gap-1 shrink-0">
                     <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => startEdit(ch)}><Edit2 className="w-3.5 h-3.5" /></Button>
-                    <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDelete("chapters", ch.id, () => fetchChapters(selectedSubject!.id))}><Trash2 className="w-3.5 h-3.5" /></Button>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDelete("chapters", ch.id, () => fetchChapters(selectedCourse?.has_cycles ? selectedCycle!.id : selectedSubject!.id, selectedCourse?.has_cycles))}><Trash2 className="w-3.5 h-3.5" /></Button>
                   </div>
                 </div>
               </div>

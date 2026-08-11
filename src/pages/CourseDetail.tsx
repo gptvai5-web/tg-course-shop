@@ -92,7 +92,7 @@ const CourseDetail = () => {
 
   const [cycles, setCycles] = useState<any[]>([]);
   const [cycleEnrollments, setCycleEnrollments] = useState<Set<string>>(new Set());
-
+  const [selectedCycleIds, setSelectedCycleIds] = useState<Set<string>>(new Set());
   const [realStudentCount, setRealStudentCount] = useState(0);
   const [countdown, setCountdown] = useState<{ days: number; hours: number; minutes: number; seconds: number } | null>(null);
 
@@ -229,19 +229,23 @@ const CourseDetail = () => {
     setEnrolling(false);
   };
 
-  const handleEnrollCycle = async (cycleId: string, cyclePrice: number) => {
+  const handleEnrollSelectedCycles = async () => {
     if (!user) { setLoginDialogOpen(true); return; }
     if (!course) return;
+    if (selectedCycleIds.size === 0) return;
     setEnrolling(true);
 
-    if (cyclePrice <= 0) {
-      const { error } = await supabase.from("cycle_enrollments").insert({ user_id: user.id, cycle_id: cycleId, course_id: course.id });
-      if (error) {
-        toast({ title: "Error", description: error.message, variant: "destructive" });
-      } else {
-        setCycleEnrollments(new Set([...cycleEnrollments, cycleId]));
-        toast({ title: "Enrolled!", description: "You have been successfully enrolled in this cycle." });
+    const selectedCyclesList = cycles.filter(c => selectedCycleIds.has(c.id));
+    const totalPrice = selectedCyclesList.reduce((sum, c) => sum + c.price, 0);
+    const cycleIdsArray = Array.from(selectedCycleIds);
+
+    if (totalPrice <= 0) {
+      for (const cycleId of cycleIdsArray) {
+        await supabase.from("cycle_enrollments").insert({ user_id: user.id, cycle_id: cycleId, course_id: course.id });
       }
+      setCycleEnrollments(new Set([...cycleEnrollments, ...cycleIdsArray]));
+      setSelectedCycleIds(new Set());
+      toast({ title: "Enrolled!", description: "You have been successfully enrolled in selected cycles." });
       setEnrolling(false);
       return;
     }
@@ -260,8 +264,8 @@ const CourseDetail = () => {
           },
           body: JSON.stringify({
             course_id: course.id,
-            cycle_id: cycleId,
-            amount: cyclePrice,
+            cycle_ids: cycleIdsArray,
+            amount: totalPrice,
             cust_name: user.user_metadata?.full_name || user.email?.split("@")[0] || "Student",
             cust_email: user.email || "",
             cust_phone: user.user_metadata?.phone || "01700000000",
@@ -498,29 +502,54 @@ const CourseDetail = () => {
                       <h3 className="font-bold text-lg border-b border-border pb-2">Available Cycles</h3>
                       {cycles.map(cycle => {
                         const enrolled = cycleEnrollments.has(cycle.id) || isEnrolled;
+                        const isSelected = selectedCycleIds.has(cycle.id);
                         return (
-                          <div key={cycle.id} className="flex flex-col gap-3 p-4 bg-muted/30 border border-border rounded-xl">
-                            <div className="flex justify-between items-start gap-2">
-                              <span className="font-bold text-sm leading-tight">{cycle.title}</span>
-                              <div className="text-right shrink-0">
-                                <span className="font-bold text-primary block">৳{cycle.price}</span>
-                                {cycle.original_price && cycle.original_price > cycle.price && (
-                                  <span className="text-[10px] text-muted-foreground line-through block">৳{cycle.original_price}</span>
-                                )}
-                              </div>
+                          <div key={cycle.id} className="flex gap-3 p-4 bg-muted/30 border border-border rounded-xl cursor-pointer hover:bg-muted/50 transition-colors"
+                               onClick={() => {
+                                 if (enrolled) return;
+                                 const next = new Set(selectedCycleIds);
+                                 if (next.has(cycle.id)) next.delete(cycle.id);
+                                 else next.add(cycle.id);
+                                 setSelectedCycleIds(next);
+                               }}>
+                            <div className="pt-1">
+                              {enrolled ? (
+                                <CheckCircle className="w-5 h-5 text-success" />
+                              ) : (
+                                <div className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${isSelected ? 'bg-primary border-primary text-primary-foreground' : 'border-input bg-background'}`}>
+                                  {isSelected && <CheckCircle className="w-3.5 h-3.5" />}
+                                </div>
+                              )}
                             </div>
-                            {enrolled ? (
-                              <Button className="w-full bg-success/10 text-success hover:bg-success/20 rounded-lg h-9 text-xs" disabled>
-                                <CheckCircle className="w-4 h-4 mr-1.5"/> Enrolled
-                              </Button>
-                            ) : (
-                              <Button onClick={() => handleEnrollCycle(cycle.id, cycle.price)} disabled={enrolling} className="w-full bg-primary/10 text-primary hover:bg-primary/20 rounded-lg h-9 text-xs">
-                                Buy Cycle
-                              </Button>
-                            )}
+                            <div className="flex-1 min-w-0">
+                              <div className="flex justify-between items-start gap-2 mb-1">
+                                <span className="font-bold text-sm leading-tight text-foreground">{cycle.title}</span>
+                                <div className="text-right shrink-0">
+                                  <span className="font-bold text-primary block">৳{cycle.price}</span>
+                                  {cycle.original_price && cycle.original_price > cycle.price && (
+                                    <span className="text-[10px] text-muted-foreground line-through block">৳{cycle.original_price}</span>
+                                  )}
+                                </div>
+                              </div>
+                              {enrolled && <span className="text-xs text-success font-medium">Already Enrolled</span>}
+                            </div>
                           </div>
                         )
                       })}
+
+                      {selectedCycleIds.size > 0 && (
+                        <div className="mt-4 p-4 border border-primary/20 bg-primary/5 rounded-xl">
+                          <div className="flex justify-between items-center mb-3">
+                            <span className="text-sm font-medium">Selected ({selectedCycleIds.size})</span>
+                            <span className="text-lg font-bold text-primary">
+                              ৳{cycles.filter(c => selectedCycleIds.has(c.id)).reduce((sum, c) => sum + c.price, 0)}
+                            </span>
+                          </div>
+                          <Button onClick={handleEnrollSelectedCycles} disabled={enrolling} className="w-full bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl h-12 font-bold shadow-lg shadow-primary/25">
+                            {enrolling ? "Processing..." : "Pay & Enroll Selected"}
+                          </Button>
+                        </div>
+                      )}
                       
                       {/* Optional: Still show full course enroll button if they want to buy the whole thing */}
                       {!isEnrolled && (

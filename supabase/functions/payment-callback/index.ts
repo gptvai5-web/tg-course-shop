@@ -76,8 +76,26 @@ serve(async (req) => {
             }
           }
         }
+      } else if (payment.cycle_ids && payment.cycle_ids.length > 0) {
+        // Enroll in multiple cycles
+        for (const cycle_id of payment.cycle_ids) {
+          const { data: existingCycle } = await adminClient
+            .from("cycle_enrollments")
+            .select("id")
+            .eq("user_id", payment.user_id)
+            .eq("cycle_id", cycle_id)
+            .maybeSingle();
+
+          if (!existingCycle) {
+            await adminClient.from("cycle_enrollments").insert({
+              user_id: payment.user_id,
+              cycle_id: cycle_id,
+              course_id: payment.course_id,
+            });
+          }
+        }
       } else if (payment.cycle_id) {
-        // Enroll in cycle
+        // Fallback for single cycle enrollment (legacy)
         const { data: existingCycle } = await adminClient
           .from("cycle_enrollments")
           .select("id")

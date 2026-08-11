@@ -79,7 +79,9 @@ const App = () => (
             <Route path="/course/:id/content" element={<ProtectedRoute><CourseSubjects /></ProtectedRoute>} />
             <Route path="/combo/:comboId/courses" element={<ProtectedRoute><ComboCourses /></ProtectedRoute>} />
             <Route path="/course/:id/subject/:subjectId" element={<ProtectedRoute><SubjectChapters /></ProtectedRoute>} />
+            <Route path="/course/:id/cycle/:subjectId" element={<ProtectedRoute><SubjectChapters /></ProtectedRoute>} />
             <Route path="/course/:id/subject/:subjectId/chapter/:chapterId" element={<ProtectedRoute><ChapterVideos /></ProtectedRoute>} />
+            <Route path="/course/:id/cycle/:subjectId/chapter/:chapterId" element={<ProtectedRoute><ChapterVideos /></ProtectedRoute>} />
             <Route path="/view-document" element={<ProtectedRoute><DocumentViewer /></ProtectedRoute>} />
             {/* Teacher */}
             <Route path="/teacher" element={<ProtectedRoute><TeacherDashboard /></ProtectedRoute>} />
