@@ -149,14 +149,24 @@ const AdminCourseContent = () => {
     const subjectVal = isCycleMode ? null : selectedSubject!.id;
     const cycleVal = isCycleMode ? selectedCycle!.id : (formCycleId === "none" ? null : formCycleId);
 
+    let err;
     if (editItem) { 
-      await (supabase.from as any)("chapters").update({ name: formName, color: formColor, cycle_id: cycleVal }).eq("id", editItem.id); 
-      toast.success("Chapter updated"); 
+      const { error } = await (supabase.from as any)("chapters").update({ name: formName, color: formColor, cycle_id: cycleVal }).eq("id", editItem.id); 
+      err = error;
+      if (!error) toast.success("Chapter updated"); 
     }
     else { 
-      await (supabase.from as any)("chapters").insert({ subject_id: subjectVal, name: formName, color: formColor, cycle_id: cycleVal, display_order: chapters.length }); 
-      toast.success("Chapter created"); 
+      const { error } = await (supabase.from as any)("chapters").insert({ subject_id: subjectVal, name: formName, color: formColor, cycle_id: cycleVal, display_order: chapters.length }); 
+      err = error;
+      if (!error) toast.success("Chapter created"); 
     }
+    
+    if (err) {
+      toast.error(err.message || "Failed to save chapter");
+      console.error(err);
+      return;
+    }
+    
     resetForm(); 
     if (isCycleMode) {
       fetchChapters(selectedCycle!.id, true);
