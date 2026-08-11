@@ -79,6 +79,7 @@ const DashboardSidebar = () => {
         { label: "Featured", icon: ImageIcon, path: "/admin/featured" },
         { label: "Course Display", icon: LayoutGrid, path: "/admin/display" },
         { label: "Combo Courses", icon: Package, path: "/admin/combos" },
+        { label: "Course Cycles", icon: Layers, path: "/admin/cycles" },
         { label: "Instructors", icon: UserCog, path: "/admin/instructors" },
         { label: "Coupons", icon: Ticket, path: "/admin/coupons" },
         { label: "Offer Timer", icon: Timer, path: "/admin/offers" },

@@ -43,17 +43,40 @@ const Learn = () => {
         .from("enrollments")
         .select("course_id, enrolled_at")
         .eq("user_id", user.id);
+        
+      const { data: cycleEnrollments } = await supabase
+        .from("cycle_enrollments")
+        .select("course_id, enrolled_at")
+        .eq("user_id", user.id);
 
-      if (enrollments && enrollments.length > 0) {
-        const courseIds = enrollments.map((e) => e.course_id);
+      const courseIds = new Set<string>();
+      const enrollTimes = new Map<string, string>();
+      
+      if (enrollments) {
+        enrollments.forEach(e => {
+          courseIds.add(e.course_id);
+          enrollTimes.set(e.course_id, e.enrolled_at);
+        });
+      }
+      
+      if (cycleEnrollments) {
+        cycleEnrollments.forEach(e => {
+          courseIds.add(e.course_id);
+          if (!enrollTimes.has(e.course_id)) {
+            enrollTimes.set(e.course_id, e.enrolled_at);
+          }
+        });
+      }
+
+      if (courseIds.size > 0) {
         const { data: coursesData } = await supabase
           .from("courses")
           .select("*")
-          .in("id", courseIds);
+          .in("id", Array.from(courseIds));
         if (coursesData) {
           setCourses(coursesData.map((c) => ({
             ...c,
-            enrolled_at: enrollments.find((e) => e.course_id === c.id)?.enrolled_at || "",
+            enrolled_at: enrollTimes.get(c.id) || "",
           })));
         }
       }

@@ -67,14 +67,29 @@ const ChapterVideos = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!chapterId || !user) return;
+    if (!chapterId || !user || !id) return;
     const fetchData = async () => {
       const [{ data: ch }, { data: v }, { data: m }] = await Promise.all([
-        (supabase.from as any)("chapters").select("id, name, color, subject_id").eq("id", chapterId).single(),
+        (supabase.from as any)("chapters").select("id, name, color, subject_id, cycle_id").eq("id", chapterId).single(),
         (supabase.from as any)("chapter_videos").select("id, title, video_url, description, display_order, embed_code").eq("chapter_id", chapterId).eq("is_active", true).order("display_order"),
         (supabase.from as any)("chapter_materials").select("id, material_type, title, url").eq("chapter_id", chapterId).eq("is_active", true).order("display_order"),
       ]);
-      setChapter(ch as Chapter | null);
+      
+      const chapterData = ch as (Chapter & { cycle_id: string | null });
+      setChapter(chapterData);
+      
+      // Access check
+      const { data: enrolls } = await supabase.from("enrollments").select("id").eq("user_id", user.id).eq("course_id", id);
+      const hasFullAccess = !!(enrolls && enrolls.length > 0);
+      
+      if (!hasFullAccess && chapterData?.cycle_id) {
+        const { data: cycleEnrolls } = await supabase.from("cycle_enrollments").select("id").eq("user_id", user.id).eq("course_id", id).eq("cycle_id", chapterData.cycle_id);
+        if (!cycleEnrolls || cycleEnrolls.length === 0) {
+          navigate(`/course/${id}`);
+          return;
+        }
+      }
+
       const vids = (v as ChapterVideo[]) || [];
       setVideos(vids);
       if (vids.length > 0) setSelectedVideo(vids[0]);
@@ -82,7 +97,7 @@ const ChapterVideos = () => {
       setLoading(false);
     };
     fetchData();
-  }, [chapterId, user]);
+  }, [chapterId, user, id, navigate]);
 
   const getYouTubeVideoId = (url: string): string | null => {
     try {

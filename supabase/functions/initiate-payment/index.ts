@@ -35,7 +35,7 @@ serve(async (req) => {
       });
     }
 
-    const { course_id, combo_id, amount, coupon_code, cust_name, cust_email, cust_phone } = await req.json();
+    const { course_id, combo_id, cycle_id, amount, coupon_code, cust_name, cust_email, cust_phone } = await req.json();
 
     if (!course_id || !amount || !cust_name || !cust_email || !cust_phone) {
       return new Response(JSON.stringify({ error: "Missing required fields" }), {
@@ -61,6 +61,7 @@ serve(async (req) => {
       user_id: user.id,
       course_id,
       combo_id: combo_id || null,
+      cycle_id: cycle_id || null,
       invoice_number: invoiceNumber,
       amount,
       currency: "BDT",

@@ -76,6 +76,22 @@ serve(async (req) => {
             }
           }
         }
+      } else if (payment.cycle_id) {
+        // Enroll in cycle
+        const { data: existingCycle } = await adminClient
+          .from("cycle_enrollments")
+          .select("id")
+          .eq("user_id", payment.user_id)
+          .eq("cycle_id", payment.cycle_id)
+          .maybeSingle();
+
+        if (!existingCycle) {
+          await adminClient.from("cycle_enrollments").insert({
+            user_id: payment.user_id,
+            cycle_id: payment.cycle_id,
+            course_id: payment.course_id,
+          });
+        }
       } else {
         // Regular course enrollment
         const { data: existing } = await adminClient

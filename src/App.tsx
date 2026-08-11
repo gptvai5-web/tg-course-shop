@@ -22,6 +22,7 @@ import AdminInstructors from "./pages/AdminInstructors";
 import AdminCoupons from "./pages/AdminCoupons";
 import AdminCourseContent from "./pages/AdminCourseContent";
 import AdminComboCourses from "./pages/AdminComboCourses";
+import AdminCycles from "./pages/AdminCycles";
 import AdminContactMessages from "./pages/AdminContactMessages";
 import AdminUserManagement from "./pages/AdminUserManagement";
 import AdminSettings from "./pages/AdminSettings";
@@ -99,6 +100,7 @@ const App = () => (
             <Route path="/admin/coupons" element={<ProtectedRoute><AdminCoupons /></ProtectedRoute>} />
             <Route path="/admin/content" element={<ProtectedRoute><AdminCourseContent /></ProtectedRoute>} />
             <Route path="/admin/combos" element={<ProtectedRoute><AdminComboCourses /></ProtectedRoute>} />
+            <Route path="/admin/cycles" element={<ProtectedRoute><AdminCycles /></ProtectedRoute>} />
             <Route path="/admin/users" element={<ProtectedRoute><AdminUserManagement /></ProtectedRoute>} />
             <Route path="/admin/contact" element={<ProtectedRoute><AdminContactMessages /></ProtectedRoute>} />
             <Route path="/admin/offers" element={<ProtectedRoute><AdminOfferTimer /></ProtectedRoute>} />

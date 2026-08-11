@@ -9,6 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { motion } from "framer-motion";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Switch } from "@/components/ui/switch";
 
 interface Course {
   id: string;
@@ -24,11 +25,13 @@ interface Course {
   lessons_count: number;
   is_active: boolean;
   slug: string | null;
+  has_cycles: boolean;
 }
 
 const emptyForm = {
   title: "", description: "", category: "", level: "Beginner", duration: "",
   price: "", original_price: "", image_url: "", instructor_name: "", lessons_count: "0", slug: "",
+  has_cycles: false,
 };
 
 const TeacherManageCourses = () => {
@@ -64,6 +67,7 @@ const TeacherManageCourses = () => {
       duration: c.duration, price: String(c.price), original_price: c.original_price ? String(c.original_price) : "",
       image_url: c.image_url, instructor_name: c.instructor_name, lessons_count: String(c.lessons_count),
       slug: c.slug || "",
+      has_cycles: c.has_cycles || false,
     });
     setDialogOpen(true);
   };
@@ -75,6 +79,7 @@ const TeacherManageCourses = () => {
       duration: form.duration, price: Number(form.price) || 0, original_price: form.original_price ? Number(form.original_price) : null,
       image_url: form.image_url, instructor_name: form.instructor_name, lessons_count: Number(form.lessons_count) || 0,
       slug: form.slug.trim() || null,
+      has_cycles: form.has_cycles,
     };
     if (editId) {
       const { error } = await supabase.from("courses").update(payload).eq("id", editId);
@@ -187,7 +192,17 @@ const TeacherManageCourses = () => {
                 </div>
                 <p className="text-[10px] text-muted-foreground mt-1">Leave empty for auto-generated URL</p>
               </div>
-              <Button onClick={handleSave} className="w-full">{editId ? "Update" : "Create"} Course</Button>
+              <div className="flex items-center justify-between p-3 border border-border rounded-xl bg-muted/20 mt-2">
+                <div>
+                  <h4 className="text-sm font-bold">Enable Cycle System</h4>
+                  <p className="text-xs text-muted-foreground mt-0.5">Allow students to purchase modules (cycles) separately</p>
+                </div>
+                <Switch 
+                  checked={form.has_cycles} 
+                  onCheckedChange={(c) => setForm({ ...form, has_cycles: c })} 
+                />
+              </div>
+              <Button onClick={handleSave} className="w-full mt-4">{editId ? "Update" : "Create"} Course</Button>
             </div>
           </DialogContent>
         </Dialog>

@@ -1,13 +1,13 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { motion } from "framer-motion";
-import { ArrowLeft, BookOpen, ArrowRight, Play } from "lucide-react";
+import { ArrowLeft, BookOpen, ArrowRight, Play, Lock } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import Navbar from "@/components/landing/Navbar";
 import Footer from "@/components/landing/Footer";
 
-interface Chapter { id: string; name: string; color: string; display_order: number; }
+interface Chapter { id: string; name: string; color: string; display_order: number; cycle_id: string | null; }
 interface Subject { id: string; name: string; color: string; course_id: string; }
 
 const SubjectChapters = () => {
@@ -17,17 +17,32 @@ const SubjectChapters = () => {
   const [chapters, setChapters] = useState<Chapter[]>([]);
   const [videoCounts, setVideoCounts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
+  const [hasFullAccess, setHasFullAccess] = useState(false);
+  const [ownedCycles, setOwnedCycles] = useState<Set<string>>(new Set());
 
   useEffect(() => {
-    if (!subjectId || !user) return;
+    if (!subjectId || !user || !id) return;
     const fetch = async () => {
       const [{ data: s }, { data: ch }] = await Promise.all([
         (supabase.from as any)("subjects").select("id, name, color, course_id").eq("id", subjectId).single(),
-        (supabase.from as any)("chapters").select("id, name, color, display_order").eq("subject_id", subjectId).eq("is_active", true).order("display_order"),
+        (supabase.from as any)("chapters").select("id, name, color, display_order, cycle_id").eq("subject_id", subjectId).eq("is_active", true).order("display_order"),
       ]);
       setSubject(s as Subject | null);
       const chaptersList = (ch as Chapter[]) || [];
       setChapters(chaptersList);
+      
+      // Check full enrollment
+      const { data: enrolls } = await supabase.from("enrollments").select("id").eq("user_id", user.id).eq("course_id", id);
+      const fullAccess = !!(enrolls && enrolls.length > 0);
+      setHasFullAccess(fullAccess);
+      
+      // Check cycle enrollments
+      if (!fullAccess) {
+        const { data: cycleEnrolls } = await supabase.from("cycle_enrollments").select("cycle_id").eq("user_id", user.id).eq("course_id", id);
+        if (cycleEnrolls) {
+          setOwnedCycles(new Set(cycleEnrolls.map(e => e.cycle_id)));
+        }
+      }
 
       // Fetch video counts per chapter
       if (chaptersList.length > 0) {
@@ -46,7 +61,7 @@ const SubjectChapters = () => {
       setLoading(false);
     };
     fetch();
-  }, [subjectId, user]);
+  }, [subjectId, user, id]);
 
   if (loading) {
     return (
@@ -91,28 +106,50 @@ const SubjectChapters = () => {
             </motion.div>
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 md:gap-5">
-              {chapters.map((ch, i) => (
-                <motion.div key={ch.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}>
-                  <Link to={`/course/${id}/subject/${subjectId}/chapter/${ch.id}`} className="block hover:scale-[1.03] hover:shadow-2xl transition-all duration-300 group">
-                    <div className="relative aspect-[3/4] rounded-2xl overflow-hidden flex flex-col" style={{ backgroundColor: ch.color }}>
-                      {/* Centered chapter name */}
-                      <div className="flex-1 flex items-center justify-center px-4">
-                        <h3 className="font-bangla font-extrabold text-white text-center text-lg sm:text-xl md:text-2xl leading-tight drop-shadow-lg">{ch.name}</h3>
-                      </div>
-                      {/* Bottom bar with video count and arrow */}
-                      <div className="flex items-center justify-between px-3 pb-3">
-                        <div className="flex items-center gap-1.5 text-white/80 text-xs font-medium">
-                          <Play className="w-3.5 h-3.5" />
-                          <span>{videoCounts[ch.id] || 0} Videos</span>
+              {chapters.map((ch, i) => {
+                const isLocked = !hasFullAccess && ch.cycle_id !== null && !ownedCycles.has(ch.cycle_id);
+                
+                return (
+                  <motion.div key={ch.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}>
+                    <Link to={isLocked ? `/course/${id}` : `/course/${id}/subject/${subjectId}/chapter/${ch.id}`} 
+                      className={`block transition-all duration-300 group ${isLocked ? 'cursor-not-allowed opacity-80' : 'hover:scale-[1.03] hover:shadow-2xl'}`}>
+                      <div className="relative aspect-[3/4] rounded-2xl overflow-hidden flex flex-col" style={{ backgroundColor: isLocked ? '#64748b' : ch.color }}>
+                        
+                        {isLocked && (
+                          <div className="absolute top-3 right-3 bg-black/30 backdrop-blur-sm rounded-full p-2">
+                            <Lock className="w-4 h-4 text-white" />
+                          </div>
+                        )}
+                        
+                        {/* Centered chapter name */}
+                        <div className="flex-1 flex items-center justify-center px-4 relative z-10">
+                          <h3 className="font-bangla font-extrabold text-white text-center text-lg sm:text-xl md:text-2xl leading-tight drop-shadow-lg">
+                            {ch.name}
+                            {isLocked && <span className="block text-xs font-normal mt-2 opacity-80">Locked - Requires Cycle</span>}
+                          </h3>
                         </div>
-                        <div className="w-8 h-8 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center group-hover:bg-white/30 transition-colors">
-                          <ArrowRight className="w-4 h-4 text-white" />
+                        
+                        {/* Bottom bar with video count and arrow */}
+                        <div className="flex items-center justify-between px-3 pb-3 relative z-10">
+                          <div className="flex items-center gap-1.5 text-white/80 text-xs font-medium">
+                            <Play className="w-3.5 h-3.5" />
+                            <span>{videoCounts[ch.id] || 0} Videos</span>
+                          </div>
+                          {!isLocked && (
+                            <div className="w-8 h-8 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center group-hover:bg-white/30 transition-colors">
+                              <ArrowRight className="w-4 h-4 text-white" />
+                            </div>
+                          )}
                         </div>
+                        
+                        {isLocked && (
+                          <div className="absolute inset-0 bg-slate-900/40 mix-blend-multiply pointer-events-none" />
+                        )}
                       </div>
-                    </div>
-                  </Link>
-                </motion.div>
-              ))}
+                    </Link>
+                  </motion.div>
+                );
+              })}
             </div>
           )}
         </div>

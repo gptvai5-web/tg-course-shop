@@ -67,6 +67,7 @@ interface Course {
   offer_end_date: string | null;
   offer_label: string | null;
   slug: string | null;
+  has_cycles: boolean;
 }
 
 const CourseDetail = () => {
@@ -88,6 +89,9 @@ const CourseDetail = () => {
   const [paymentUrl, setPaymentUrl] = useState<string | null>(null);
   const [paymentInvoice, setPaymentInvoice] = useState("");
   const [loginDialogOpen, setLoginDialogOpen] = useState(false);
+
+  const [cycles, setCycles] = useState<any[]>([]);
+  const [cycleEnrollments, setCycleEnrollments] = useState<Set<string>>(new Set());
 
   const [realStudentCount, setRealStudentCount] = useState(0);
   const [countdown, setCountdown] = useState<{ days: number; hours: number; minutes: number; seconds: number } | null>(null);
@@ -128,10 +132,14 @@ const CourseDetail = () => {
       if (data) {
         setCourse(data as Course);
         setResolvedCourseId(data.id);
-        // Use public stats function to get student count (works for anonymous users too)
         const { data: statsData } = await supabase.rpc("get_public_stats");
         const courseCounts = (statsData as any)?.course_student_counts || {};
         setRealStudentCount(courseCounts[data.id] || 0);
+        
+        if (data.has_cycles) {
+          const { data: cyclesData } = await supabase.from("cycles").select("*").eq("course_id", data.id).eq("is_active", true).order("display_order");
+          setCycles(cyclesData || []);
+        }
       } else {
         setCourse(null);
       }
@@ -149,6 +157,15 @@ const CourseDetail = () => {
       .eq("course_id", resolvedCourseId)
       .then(({ data }) => {
         if (data && data.length > 0) setIsEnrolled(true);
+      });
+      
+    supabase
+      .from("cycle_enrollments")
+      .select("cycle_id")
+      .eq("user_id", user.id)
+      .eq("course_id", resolvedCourseId)
+      .then(({ data }) => {
+        if (data) setCycleEnrollments(new Set(data.map(d => d.cycle_id)));
       });
   }, [user, resolvedCourseId]);
 
@@ -202,6 +219,57 @@ const CourseDetail = () => {
       const data = await res.json();
       if (data.success && data.payment_url) {
         // Open payment in same tab
+        window.location.href = data.payment_url;
+      } else {
+        toast({ title: "Payment Error", description: data.error || "Could not initiate payment", variant: "destructive" });
+      }
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message || "Payment failed", variant: "destructive" });
+    }
+    setEnrolling(false);
+  };
+
+  const handleEnrollCycle = async (cycleId: string, cyclePrice: number) => {
+    if (!user) { setLoginDialogOpen(true); return; }
+    if (!course) return;
+    setEnrolling(true);
+
+    if (cyclePrice <= 0) {
+      const { error } = await supabase.from("cycle_enrollments").insert({ user_id: user.id, cycle_id: cycleId, course_id: course.id });
+      if (error) {
+        toast({ title: "Error", description: error.message, variant: "destructive" });
+      } else {
+        setCycleEnrollments(new Set([...cycleEnrollments, cycleId]));
+        toast({ title: "Enrolled!", description: "You have been successfully enrolled in this cycle." });
+      }
+      setEnrolling(false);
+      return;
+    }
+
+    try {
+      const session = await supabase.auth.getSession();
+      const token = session.data.session?.access_token;
+      const res = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/initiate-payment`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+            apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          },
+          body: JSON.stringify({
+            course_id: course.id,
+            cycle_id: cycleId,
+            amount: cyclePrice,
+            cust_name: user.user_metadata?.full_name || user.email?.split("@")[0] || "Student",
+            cust_email: user.email || "",
+            cust_phone: user.user_metadata?.phone || "01700000000",
+          }),
+        }
+      );
+      const data = await res.json();
+      if (data.success && data.payment_url) {
         window.location.href = data.payment_url;
       } else {
         toast({ title: "Payment Error", description: data.error || "Could not initiate payment", variant: "destructive" });
@@ -425,9 +493,54 @@ const CourseDetail = () => {
                 </div>
 
                 <div className="p-5 space-y-5">
-                  {/* Price */}
-                  <div className="flex items-baseline gap-3 flex-wrap">
-                    <span className="text-3xl font-display font-extrabold">
+                  {course.has_cycles ? (
+                    <div className="space-y-4">
+                      <h3 className="font-bold text-lg border-b border-border pb-2">Available Cycles</h3>
+                      {cycles.map(cycle => {
+                        const enrolled = cycleEnrollments.has(cycle.id) || isEnrolled;
+                        return (
+                          <div key={cycle.id} className="flex flex-col gap-3 p-4 bg-muted/30 border border-border rounded-xl">
+                            <div className="flex justify-between items-start gap-2">
+                              <span className="font-bold text-sm leading-tight">{cycle.title}</span>
+                              <div className="text-right shrink-0">
+                                <span className="font-bold text-primary block">৳{cycle.price}</span>
+                                {cycle.original_price && cycle.original_price > cycle.price && (
+                                  <span className="text-[10px] text-muted-foreground line-through block">৳{cycle.original_price}</span>
+                                )}
+                              </div>
+                            </div>
+                            {enrolled ? (
+                              <Button className="w-full bg-success/10 text-success hover:bg-success/20 rounded-lg h-9 text-xs" disabled>
+                                <CheckCircle className="w-4 h-4 mr-1.5"/> Enrolled
+                              </Button>
+                            ) : (
+                              <Button onClick={() => handleEnrollCycle(cycle.id, cycle.price)} disabled={enrolling} className="w-full bg-primary/10 text-primary hover:bg-primary/20 rounded-lg h-9 text-xs">
+                                Buy Cycle
+                              </Button>
+                            )}
+                          </div>
+                        )
+                      })}
+                      
+                      {/* Optional: Still show full course enroll button if they want to buy the whole thing */}
+                      {!isEnrolled && (
+                        <div className="mt-6 pt-6 border-t border-border">
+                          <p className="text-xs text-muted-foreground mb-2 text-center">Or purchase the complete course</p>
+                          <div className="flex items-center justify-center gap-2 mb-3">
+                            <span className="text-2xl font-bold">৳{course.price}</span>
+                            {course.original_price && <span className="text-sm line-through text-muted-foreground">৳{course.original_price}</span>}
+                          </div>
+                          <Button className="w-full h-12 rounded-xl bg-gradient-primary shadow-lg shadow-primary/20" disabled={enrolling} onClick={handleEnroll}>
+                            {enrolling ? "Processing..." : "Enroll Full Course"}
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <>
+                      {/* Price */}
+                      <div className="flex items-baseline gap-3 flex-wrap">
+                        <span className="text-3xl font-display font-extrabold">
                       ৳{couponApplied ? getFinalPrice() : course.price}
                     </span>
                     {couponApplied && (
@@ -486,6 +599,8 @@ const CourseDetail = () => {
                     >
                       {enrolling ? "Processing..." : (couponApplied ? getFinalPrice() : course.price) <= 0 ? "Enroll Free" : "Pay & Enroll Now"}
                     </Button>
+                  )}
+                  </>
                   )}
 
                   {/* Stats */}
