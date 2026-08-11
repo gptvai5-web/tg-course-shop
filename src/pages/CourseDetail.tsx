@@ -444,6 +444,146 @@ const CourseDetail = () => {
                   <InstructorDisplay name={course.instructor_name} />
                 </div>
 
+                {/* Purchase / Cycles Section */}
+                <div className="bg-card border border-border rounded-2xl p-6 shadow-sm">
+                  {/* Coupon section shared by both */}
+                  <div className="space-y-3 mb-2 pb-5 border-b border-border/50">
+                    {couponApplied && (
+                      <span className="inline-block text-sm font-bold text-green-600 mb-2">
+                        Coupon "{couponApplied.code}" applied — {couponApplied.discount_type === "percentage" ? `${couponApplied.discount_value}%` : `৳${couponApplied.discount_value}`} OFF
+                      </span>
+                    )}
+                    <div className="flex gap-2">
+                      <Input
+                        value={couponCode}
+                        onChange={(e) => setCouponCode(e.target.value)}
+                        placeholder="Enter coupon code"
+                        className="flex-1 rounded-xl bg-background"
+                        disabled={!!couponApplied}
+                      />
+                      {couponApplied ? (
+                        <Button variant="outline" className="rounded-xl" onClick={() => { setCouponApplied(null); setCouponCode(""); }}>
+                          Remove
+                        </Button>
+                      ) : (
+                        <Button variant="outline" className="rounded-xl bg-background" onClick={applyCoupon} disabled={applyingCoupon || !couponCode.trim()}>
+                          {applyingCoupon ? "..." : "Apply"}
+                        </Button>
+                      )}
+                    </div>
+                    {couponError && <p className="text-sm text-destructive">{couponError}</p>}
+                  </div>
+
+                  {course.has_cycles ? (
+                    <div className="space-y-4 pt-2">
+                      <h3 className="font-bold text-lg border-b border-border pb-2">Available Cycles</h3>
+                      {cycles.map(cycle => {
+                        const enrolled = cycleEnrollments.has(cycle.id) || isEnrolled;
+                        const isSelected = selectedCycleIds.has(cycle.id);
+                        return (
+                          <div key={cycle.id} className="flex gap-3 p-4 bg-muted/30 border border-border rounded-xl cursor-pointer hover:bg-muted/50 transition-colors"
+                               onClick={() => {
+                                 if (enrolled) return;
+                                 const next = new Set(selectedCycleIds);
+                                 if (next.has(cycle.id)) next.delete(cycle.id);
+                                 else next.add(cycle.id);
+                                 setSelectedCycleIds(next);
+                               }}>
+                            <div className="pt-1">
+                              {enrolled ? (
+                                <CheckCircle className="w-5 h-5 text-success" />
+                              ) : (
+                                <div className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${isSelected ? 'bg-primary border-primary text-primary-foreground' : 'border-input bg-background'}`}>
+                                  {isSelected && <CheckCircle className="w-3.5 h-3.5" />}
+                                </div>
+                              )}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex justify-between items-start gap-2 mb-1">
+                                <span className="font-bold text-sm leading-tight text-foreground">{cycle.title}</span>
+                                <div className="text-right shrink-0">
+                                  <span className="font-bold text-primary block">৳{cycle.price}</span>
+                                  {cycle.original_price && cycle.original_price > cycle.price && (
+                                    <span className="text-[10px] text-muted-foreground line-through block">৳{cycle.original_price}</span>
+                                  )}
+                                </div>
+                              </div>
+                              {enrolled && <span className="text-xs text-success font-medium">Already Enrolled</span>}
+                            </div>
+                          </div>
+                        )
+                      })}
+
+                      {selectedCycleIds.size > 0 && (
+                        <div className="mt-4 p-4 border border-primary/20 bg-primary/5 rounded-xl">
+                          <div className="flex justify-between items-center mb-3">
+                            <span className="text-sm font-medium">Selected ({selectedCycleIds.size})</span>
+                            <span className="text-lg font-bold text-primary text-right flex flex-col items-end">
+                              ৳{couponApplied ? getCycleFinalPrice() : cycles.filter(c => selectedCycleIds.has(c.id)).reduce((sum, c) => sum + c.price, 0)}
+                              {couponApplied && (
+                                <span className="text-xs line-through text-muted-foreground mt-0.5">
+                                  ৳{cycles.filter(c => selectedCycleIds.has(c.id)).reduce((sum, c) => sum + c.price, 0)}
+                                </span>
+                              )}
+                            </span>
+                          </div>
+                          <Button onClick={handleEnrollSelectedCycles} disabled={enrolling} className="w-full bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl h-12 font-bold shadow-lg shadow-primary/25">
+                            {enrolling ? "Processing..." : "Pay & Enroll Selected"}
+                          </Button>
+                        </div>
+                      )}
+                      
+                      {!isEnrolled && (
+                        <div className="mt-6 pt-6 border-t border-border">
+                          <p className="text-xs text-muted-foreground mb-2 text-center">Or purchase the complete course</p>
+                          <div className="flex items-center justify-center gap-2 mb-3">
+                            <span className="text-2xl font-bold">৳{course.price}</span>
+                            {course.original_price && <span className="text-sm line-through text-muted-foreground">৳{course.original_price}</span>}
+                          </div>
+                          <Button className="w-full h-12 rounded-xl bg-gradient-primary shadow-lg shadow-primary/20" disabled={enrolling} onClick={handleEnroll}>
+                            {enrolling ? "Processing..." : "Enroll Full Course"}
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="pt-2">
+                      <div className="flex items-baseline gap-3 flex-wrap mb-4">
+                        <span className="text-3xl font-display font-extrabold">
+                          ৳{couponApplied ? getFinalPrice() : course.price}
+                        </span>
+                        {couponApplied && (
+                          <span className="text-lg text-muted-foreground line-through">৳{course.price}</span>
+                        )}
+                        {!couponApplied && course.original_price && course.original_price > course.price && (
+                          <span className="text-lg text-muted-foreground line-through">৳{course.original_price}</span>
+                        )}
+                      </div>
+
+                      {discount && !couponApplied && (
+                        <span className="inline-block text-sm font-bold text-destructive mb-4">{discount}% OFF</span>
+                      )}
+
+                      {isEnrolled ? (
+                        <Button
+                          className="w-full h-14 text-base font-bold rounded-xl bg-gradient-primary hover:opacity-90 transition-opacity shadow-lg shadow-primary/25"
+                          onClick={() => navigate(`/course/${course.id}/content`)}
+                        >
+                          Continue Course →
+                        </Button>
+                      ) : (
+                        <Button
+                          className="w-full h-14 text-base font-bold rounded-xl bg-gradient-primary hover:opacity-90 transition-opacity shadow-lg shadow-primary/25"
+                          disabled={enrolling}
+                          onClick={handleEnroll}
+                        >
+                          {enrolling ? "Processing..." : (couponApplied ? getFinalPrice() : course.price) <= 0 ? "Enroll Free" : "Pay & Enroll Now"}
+                        </Button>
+                      )}
+                    </div>
+                  )}
+                </div>
+
                 {/* Description */}
                 <div>
                   <h3 className="font-display font-bold text-lg mb-3">Course Description</h3>
@@ -508,150 +648,7 @@ const CourseDetail = () => {
                   />
                 </div>
 
-                <div className="p-5 space-y-5">
-                  {/* Coupon section shared by both */}
-                  <div className="space-y-2 mb-2 pb-4 border-b border-border/50">
-                    {couponApplied && (
-                      <span className="inline-block text-sm font-bold text-green-600 mb-2">
-                        Coupon "{couponApplied.code}" applied — {couponApplied.discount_type === "percentage" ? `${couponApplied.discount_value}%` : `৳${couponApplied.discount_value}`} OFF
-                      </span>
-                    )}
-                    <div className="flex gap-2">
-                      <Input
-                        value={couponCode}
-                        onChange={(e) => setCouponCode(e.target.value)}
-                        placeholder="Enter coupon code"
-                        className="flex-1 rounded-xl"
-                        disabled={!!couponApplied}
-                      />
-                      {couponApplied ? (
-                        <Button variant="outline" className="rounded-xl" onClick={() => { setCouponApplied(null); setCouponCode(""); }}>
-                          Remove
-                        </Button>
-                      ) : (
-                        <Button variant="outline" className="rounded-xl" onClick={applyCoupon} disabled={applyingCoupon || !couponCode.trim()}>
-                          {applyingCoupon ? "..." : "Apply"}
-                        </Button>
-                      )}
-                    </div>
-                    {couponError && <p className="text-sm text-destructive">{couponError}</p>}
-                  </div>
-
-                  {course.has_cycles ? (
-                    <div className="space-y-4">
-                      <h3 className="font-bold text-lg border-b border-border pb-2">Available Cycles</h3>
-                      {cycles.map(cycle => {
-                        const enrolled = cycleEnrollments.has(cycle.id) || isEnrolled;
-                        const isSelected = selectedCycleIds.has(cycle.id);
-                        return (
-                          <div key={cycle.id} className="flex gap-3 p-4 bg-muted/30 border border-border rounded-xl cursor-pointer hover:bg-muted/50 transition-colors"
-                               onClick={() => {
-                                 if (enrolled) return;
-                                 const next = new Set(selectedCycleIds);
-                                 if (next.has(cycle.id)) next.delete(cycle.id);
-                                 else next.add(cycle.id);
-                                 setSelectedCycleIds(next);
-                               }}>
-                            <div className="pt-1">
-                              {enrolled ? (
-                                <CheckCircle className="w-5 h-5 text-success" />
-                              ) : (
-                                <div className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${isSelected ? 'bg-primary border-primary text-primary-foreground' : 'border-input bg-background'}`}>
-                                  {isSelected && <CheckCircle className="w-3.5 h-3.5" />}
-                                </div>
-                              )}
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <div className="flex justify-between items-start gap-2 mb-1">
-                                <span className="font-bold text-sm leading-tight text-foreground">{cycle.title}</span>
-                                <div className="text-right shrink-0">
-                                  <span className="font-bold text-primary block">৳{cycle.price}</span>
-                                  {cycle.original_price && cycle.original_price > cycle.price && (
-                                    <span className="text-[10px] text-muted-foreground line-through block">৳{cycle.original_price}</span>
-                                  )}
-                                </div>
-                              </div>
-                              {enrolled && <span className="text-xs text-success font-medium">Already Enrolled</span>}
-                            </div>
-                          </div>
-                        )
-                      })}
-
-                      {selectedCycleIds.size > 0 && (
-                        <div className="mt-4 p-4 border border-primary/20 bg-primary/5 rounded-xl">
-                          <div className="flex justify-between items-center mb-3">
-                            <span className="text-sm font-medium">Selected ({selectedCycleIds.size})</span>
-                            <span className="text-lg font-bold text-primary text-right flex flex-col items-end">
-                              ৳{couponApplied ? getCycleFinalPrice() : cycles.filter(c => selectedCycleIds.has(c.id)).reduce((sum, c) => sum + c.price, 0)}
-                              {couponApplied && (
-                                <span className="text-xs line-through text-muted-foreground mt-0.5">
-                                  ৳{cycles.filter(c => selectedCycleIds.has(c.id)).reduce((sum, c) => sum + c.price, 0)}
-                                </span>
-                              )}
-                            </span>
-                          </div>
-                          <Button onClick={handleEnrollSelectedCycles} disabled={enrolling} className="w-full bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl h-12 font-bold shadow-lg shadow-primary/25">
-                            {enrolling ? "Processing..." : "Pay & Enroll Selected"}
-                          </Button>
-                        </div>
-                      )}
-                      
-                      {/* Optional: Still show full course enroll button if they want to buy the whole thing */}
-                      {!isEnrolled && (
-                        <div className="mt-6 pt-6 border-t border-border">
-                          <p className="text-xs text-muted-foreground mb-2 text-center">Or purchase the complete course</p>
-                          <div className="flex items-center justify-center gap-2 mb-3">
-                            <span className="text-2xl font-bold">৳{course.price}</span>
-                            {course.original_price && <span className="text-sm line-through text-muted-foreground">৳{course.original_price}</span>}
-                          </div>
-                          <Button className="w-full h-12 rounded-xl bg-gradient-primary shadow-lg shadow-primary/20" disabled={enrolling} onClick={handleEnroll}>
-                            {enrolling ? "Processing..." : "Enroll Full Course"}
-                          </Button>
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    <>
-                      {/* Price */}
-                      <div className="flex items-baseline gap-3 flex-wrap">
-                        <span className="text-3xl font-display font-extrabold">
-                      ৳{couponApplied ? getFinalPrice() : course.price}
-                    </span>
-                    {couponApplied && (
-                      <span className="text-lg text-muted-foreground line-through">৳{course.price}</span>
-                    )}
-                    {!couponApplied && course.original_price && course.original_price > course.price && (
-                      <span className="text-lg text-muted-foreground line-through">৳{course.original_price}</span>
-                    )}
-                  </div>
-
-                  {discount && !couponApplied && (
-                    <span className="inline-block text-sm font-bold text-destructive">{discount}% OFF</span>
-                  )}
-
-
-                  {/* Enroll / Continue Button */}
-                  {isEnrolled ? (
-                    <Button
-                      className="w-full h-14 text-base font-bold rounded-xl bg-gradient-primary hover:opacity-90 transition-opacity shadow-lg shadow-primary/25"
-                      onClick={() => navigate(`/course/${course.id}/content`)}
-                    >
-                      Continue Course →
-                    </Button>
-                  ) : (
-                    <Button
-                      className="w-full h-14 text-base font-bold rounded-xl bg-gradient-primary hover:opacity-90 transition-opacity shadow-lg shadow-primary/25"
-                      disabled={enrolling}
-                      onClick={handleEnroll}
-                    >
-                      {enrolling ? "Processing..." : (couponApplied ? getFinalPrice() : course.price) <= 0 ? "Enroll Free" : "Pay & Enroll Now"}
-                    </Button>
-                  )}
-                  </>
-                  )}
-
-                  {/* Stats */}
-                  <div className="space-y-0 divide-y divide-border">
+                <div className="p-5 space-y-0 divide-y divide-border">
                     <div className="flex items-center justify-between py-3">
                       <span className="flex items-center gap-2 text-sm text-muted-foreground">
                         <Users className="w-4 h-4" /> Students
@@ -678,7 +675,6 @@ const CourseDetail = () => {
                     </div>
                   </div>
                 </div>
-              </div>
             </motion.div>
           </div>
         </div>
