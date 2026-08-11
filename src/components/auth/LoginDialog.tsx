@@ -1,11 +1,9 @@
 import { useState } from "react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
-import { Drawer, DrawerContent } from "@/components/ui/drawer";
 import { Button } from "@/components/ui/button";
 import { GraduationCap } from "lucide-react";
 import { signInWithGoogle } from "@/lib/auth-google";
 import { toast } from "sonner";
-import { useIsMobile } from "@/hooks/use-mobile";
 
 interface LoginDialogProps {
   open: boolean;
@@ -59,22 +57,9 @@ const LoginForm = () => {
 };
 
 const LoginDialog = ({ open, onOpenChange }: LoginDialogProps) => {
-  const isMobile = useIsMobile();
-
-  if (isMobile) {
-    return (
-      <Drawer open={open} onOpenChange={onOpenChange}>
-        <DrawerContent className="px-4 pb-6 pt-2 max-h-[90vh] overflow-y-auto">
-          <div className="mx-auto w-12 h-1.5 flex-shrink-0 rounded-full bg-muted mb-4" />
-          <LoginForm />
-        </DrawerContent>
-      </Drawer>
-    );
-  }
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md p-6 rounded-2xl border-border bg-card">
+      <DialogContent className="w-[90vw] max-w-md p-6 rounded-2xl border-border bg-card">
         <LoginForm />
       </DialogContent>
     </Dialog>
