@@ -236,10 +236,10 @@ const CourseDetail = () => {
     setEnrolling(true);
 
     const selectedCyclesList = cycles.filter(c => selectedCycleIds.has(c.id));
-    const totalPrice = selectedCyclesList.reduce((sum, c) => sum + c.price, 0);
     const cycleIdsArray = Array.from(selectedCycleIds);
+    const finalCyclePrice = couponApplied ? getCycleFinalPrice() : selectedCyclesList.reduce((sum, c) => sum + c.price, 0);
 
-    if (totalPrice <= 0) {
+    if (finalCyclePrice <= 0) {
       for (const cycleId of cycleIdsArray) {
         await supabase.from("cycle_enrollments").insert({ user_id: user.id, cycle_id: cycleId, course_id: course.id });
       }
@@ -265,7 +265,8 @@ const CourseDetail = () => {
           body: JSON.stringify({
             course_id: course.id,
             cycle_ids: cycleIdsArray,
-            amount: totalPrice,
+            amount: finalCyclePrice,
+            coupon_code: couponApplied?.code || null,
             cust_name: user.user_metadata?.full_name || user.email?.split("@")[0] || "Student",
             cust_email: user.email || "",
             cust_phone: user.user_metadata?.phone || "01700000000",
@@ -334,6 +335,17 @@ const CourseDetail = () => {
       return Math.max(0, Math.round(course.price * (1 - couponApplied.discount_value / 100)));
     }
     return Math.max(0, course.price - couponApplied.discount_value);
+  };
+
+  const getCycleFinalPrice = () => {
+    const selectedCyclesList = cycles.filter(c => selectedCycleIds.has(c.id));
+    const totalPrice = selectedCyclesList.reduce((sum, c) => sum + c.price, 0);
+    if (!couponApplied) return totalPrice;
+    if (couponApplied.discount_type === "percentage") {
+      const discountAmount = (totalPrice * couponApplied.discount_value) / 100;
+      return Math.max(0, Math.round(totalPrice - discountAmount));
+    }
+    return Math.max(0, totalPrice - couponApplied.discount_value);
   };
 
   if (loading) {
@@ -497,6 +509,34 @@ const CourseDetail = () => {
                 </div>
 
                 <div className="p-5 space-y-5">
+                  {/* Coupon section shared by both */}
+                  <div className="space-y-2 mb-2 pb-4 border-b border-border/50">
+                    {couponApplied && (
+                      <span className="inline-block text-sm font-bold text-green-600 mb-2">
+                        Coupon "{couponApplied.code}" applied — {couponApplied.discount_type === "percentage" ? `${couponApplied.discount_value}%` : `৳${couponApplied.discount_value}`} OFF
+                      </span>
+                    )}
+                    <div className="flex gap-2">
+                      <Input
+                        value={couponCode}
+                        onChange={(e) => setCouponCode(e.target.value)}
+                        placeholder="Enter coupon code"
+                        className="flex-1 rounded-xl"
+                        disabled={!!couponApplied}
+                      />
+                      {couponApplied ? (
+                        <Button variant="outline" className="rounded-xl" onClick={() => { setCouponApplied(null); setCouponCode(""); }}>
+                          Remove
+                        </Button>
+                      ) : (
+                        <Button variant="outline" className="rounded-xl" onClick={applyCoupon} disabled={applyingCoupon || !couponCode.trim()}>
+                          {applyingCoupon ? "..." : "Apply"}
+                        </Button>
+                      )}
+                    </div>
+                    {couponError && <p className="text-sm text-destructive">{couponError}</p>}
+                  </div>
+
                   {course.has_cycles ? (
                     <div className="space-y-4">
                       <h3 className="font-bold text-lg border-b border-border pb-2">Available Cycles</h3>
@@ -541,8 +581,13 @@ const CourseDetail = () => {
                         <div className="mt-4 p-4 border border-primary/20 bg-primary/5 rounded-xl">
                           <div className="flex justify-between items-center mb-3">
                             <span className="text-sm font-medium">Selected ({selectedCycleIds.size})</span>
-                            <span className="text-lg font-bold text-primary">
-                              ৳{cycles.filter(c => selectedCycleIds.has(c.id)).reduce((sum, c) => sum + c.price, 0)}
+                            <span className="text-lg font-bold text-primary text-right flex flex-col items-end">
+                              ৳{couponApplied ? getCycleFinalPrice() : cycles.filter(c => selectedCycleIds.has(c.id)).reduce((sum, c) => sum + c.price, 0)}
+                              {couponApplied && (
+                                <span className="text-xs line-through text-muted-foreground mt-0.5">
+                                  ৳{cycles.filter(c => selectedCycleIds.has(c.id)).reduce((sum, c) => sum + c.price, 0)}
+                                </span>
+                              )}
                             </span>
                           </div>
                           <Button onClick={handleEnrollSelectedCycles} disabled={enrolling} className="w-full bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl h-12 font-bold shadow-lg shadow-primary/25">
@@ -583,34 +628,7 @@ const CourseDetail = () => {
                   {discount && !couponApplied && (
                     <span className="inline-block text-sm font-bold text-destructive">{discount}% OFF</span>
                   )}
-                  {couponApplied && (
-                    <span className="inline-block text-sm font-bold text-green-600">
-                      Coupon "{couponApplied.code}" applied — {couponApplied.discount_type === "percentage" ? `${couponApplied.discount_value}%` : `৳${couponApplied.discount_value}`} OFF
-                    </span>
-                  )}
 
-                  {/* Coupon input */}
-                  <div className="space-y-2">
-                    <div className="flex gap-2">
-                      <Input
-                        value={couponCode}
-                        onChange={(e) => setCouponCode(e.target.value)}
-                        placeholder="Enter coupon code"
-                        className="flex-1 rounded-xl"
-                        disabled={!!couponApplied}
-                      />
-                      {couponApplied ? (
-                        <Button variant="outline" className="rounded-xl" onClick={() => { setCouponApplied(null); setCouponCode(""); }}>
-                          Remove
-                        </Button>
-                      ) : (
-                        <Button variant="outline" className="rounded-xl" onClick={applyCoupon} disabled={applyingCoupon || !couponCode.trim()}>
-                          {applyingCoupon ? "..." : "Apply"}
-                        </Button>
-                      )}
-                    </div>
-                    {couponError && <p className="text-sm text-destructive">{couponError}</p>}
-                  </div>
 
                   {/* Enroll / Continue Button */}
                   {isEnrolled ? (
