@@ -318,7 +318,6 @@ const CourseDetail = () => {
               </div>
               <div className="flex items-center gap-2">
                 {[
-                  { value: countdown.days, label: "DAYS" },
                   { value: countdown.hours, label: "HOURS" },
                   { value: countdown.minutes, label: "MINUTES" },
                   { value: countdown.seconds, label: "SECONDS" },
