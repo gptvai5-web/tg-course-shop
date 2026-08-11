@@ -33,7 +33,7 @@ const MarketingPopup = () => {
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogContent className="sm:max-w-md p-0 overflow-hidden bg-card border-border rounded-2xl">
+      <DialogContent className="sm:max-w-md p-0 overflow-hidden bg-card border-border rounded-2xl [&>button]:hidden">
         <div className="relative p-6 pt-10 text-center flex flex-col items-center">
           {/* Normal Red Close Button */}
           <button
