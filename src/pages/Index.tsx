@@ -4,6 +4,7 @@ import LearningPathSection from "@/components/landing/LearningPathSection";
 import ReviewsSection from "@/components/landing/ReviewsSection";
 import TelegramSection from "@/components/landing/TelegramSection";
 import Footer from "@/components/landing/Footer";
+import MarketingPopup from "@/components/landing/MarketingPopup";
 
 const Index = () => {
   return (
@@ -14,6 +15,7 @@ const Index = () => {
       <ReviewsSection />
       <TelegramSection />
       <Footer />
+      <MarketingPopup />
     </div>
   );
 };
